@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use std::f32::consts::TAU;
+use bevy::window::PresentMode;
 
 
 #[derive(Component)]
@@ -11,7 +12,18 @@ struct Rotatable {
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            window: WindowDescriptor {
+                title: "3D".to_string(),
+                width: 1500.,
+                height: 900.,
+                
+                ..default()
+            },
+            add_primary_window: true,
+            exit_on_all_closed: true,
+            close_when_requested: true,
+        }))
         .add_startup_system(setup)
         .add_system(rotate_cube)
         .run();
@@ -41,7 +53,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     commands.spawn((
         PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-            material: materials.add(Color::WHITE.into()),
+            material: materials.add(Color::LIME_GREEN.into()),
             transform: Transform::from_translation(Vec3::ZERO),
             ..default()
         },
@@ -69,6 +81,9 @@ fn rotate_cube(mut cubes: Query<(&mut Transform, &Rotatable)>, timer: Res<Time>,
             transform.rotate_x(cube.speed * TAU * timer.delta_seconds());
         }
     }
+
+
+
 
 }
 
