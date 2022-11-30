@@ -1,3 +1,4 @@
+#[warn(dead_code)]
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 use bevy::core_pipeline::clear_color::ClearColorConfig;
@@ -31,13 +32,14 @@ impl Default for PanOrbitCamera {
 }
 
 #[derive(Component)]
-struct Cube {
+struct MovableCube {
     x: f32,
     y: f32,
     z: f32,
+    speed: f32,
+    dst: f32,
 }
-#[derive(Component, Deref, DerefMut)]
-pub struct TimerForTree (pub Timer);
+
 
 
 fn main() {
@@ -56,14 +58,15 @@ fn main() {
         }))
         .add_startup_system(setup)
         .add_system(pan_orbit_camera)
+        .add_system(spawn_cube)
+        .add_system(move_cube)
         .add_plugin(WireframePlugin)
-        .add_system(spawn_cubes)
         .run();
 }
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
 
     // camera
-    let translation = Vec3::new(0.0, 0.0, 5.0);
+    let translation = Vec3::new(0.0, 0.0, 20.0);
     let radius = translation.length();
     commands.spawn((Camera3dBundle {
         transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
@@ -83,7 +86,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     let entity_spawn: Vec3 = Vec3::new(0.0, 8.0, 0.0);
     commands.spawn((PointLightBundle {
         point_light: PointLight {
-            intensity: 1500.0,
+            intensity: 5000.0,
             shadows_enabled: true,
             ..default()
         },
@@ -94,36 +97,58 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     // cube
     commands.spawn((
         PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 10.0 })),
+            mesh: meshes.add(Mesh::from(shape::Cube { size: 9.0 })),
             material: materials.add(Color::LIME_GREEN.into()),
             transform: Transform::from_translation(Vec3::ZERO),
             ..default()
-        },
-        Wireframe,
-        Cube {x: 0.0, y: 0.0, z: 0.0 },
-    ));
+        }));
 }
 
-fn spawn_cubes(mut commands: Commands, time: Res<Time>, timer: Res<TimerForTree>, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
-    let mut rng = thread_rng();
-    let time_fac: f32 = rng.gen_range(1.0..4.0);
 
-    if timer.tick(time.delta()).just_finished() {
+fn spawn_cube(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, keys: Res<Input<KeyCode>>) {
+    let mut x: f32 = 0.0;
+    let mut y: f32 = 0.0;
+    let mut z: f32 = -6.0;
+    let mut trans: Vec3 = Vec3::new(x, y, z);
 
+    if keys.pressed(KeyCode::G) {
 
-
-        commands.spawn((PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0} )),
-            material: materials.add(Color::AZURE.into()),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, -5.0)),
-            ..default()
-        },
+            commands.spawn((PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Cube { size: 3.0 })),
+                material: materials.add(Color::RED.into()),
+                transform: Transform::from_translation(trans),
+                ..default()
+            },
             Wireframe,
-        ))
-            .insert_resource(TimerForTree (Timer::from_seconds(time_fac, TimerMode::Once)));
+            MovableCube { x: x, y: y, z: z, speed: 2.0, dst: 90.0 },
+            ));
+        
+        
     }
 }
 
+fn move_cube(mut cubes: Query<(&mut Transform, &MovableCube)>, timer: Res<Time>, keys: Res<Input<KeyCode>>) {
+    
+    for (mut transform, cube) in &mut cubes {
+        let dir_x = transform.local_x();
+        let dir_y = transform.local_y();
+        let dir_z = transform.local_z();
+        
+        if keys.pressed(KeyCode::Space) {
+            transform.translation += dir_y * cube.speed * timer.delta_seconds() * cube.dst;
+        }  else if keys.pressed(KeyCode::LShift) {
+            transform.translation += -dir_y * cube.speed * timer.delta_seconds() * cube.dst;
+        } else if keys.pressed(KeyCode::A) {
+            transform.translation += dir_x * cube.speed * timer.delta_seconds() * cube.dst;
+        } else if keys.pressed(KeyCode::D) {
+            transform.translation += -dir_x * cube.speed * timer.delta_seconds() * cube.dst;
+        } else if keys.pressed(KeyCode::W) {
+            transform.translation += dir_z * cube.speed * timer.delta_seconds() * cube.dst;
+        } else if keys.pressed(KeyCode::S) {
+            transform.translation += -dir_z * cube.speed * timer.delta_seconds() * cube.dst;
+        }
+    }
+}
 
 
 
