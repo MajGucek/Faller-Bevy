@@ -11,7 +11,7 @@ use bevy::window::CursorGrabMode;
 use bevy::pbr::wireframe::{Wireframe, WireframeConfig, WireframePlugin};
 use bevy::render::{render_resource::WgpuFeatures, settings::WgpuSettings};
 use rand::*;
-use bevy::time::Stopwatch;
+use bevy::time::{FixedTimestep, Stopwatch};
 
 #[derive(Component)]
 struct PanOrbitCamera {
@@ -33,11 +33,20 @@ impl Default for PanOrbitCamera {
 
 #[derive(Component)]
 struct MovableCube {
-    x: f32,
-    y: f32,
-    z: f32,
     speed: f32,
     dst: f32,
+}
+
+#[derive(Component)]
+struct Turn {
+    from_x: bool,
+}
+impl Default for Turn {
+    fn default() -> Self {
+        Turn {
+            from_x: false,
+        }
+    }
 }
 
 
@@ -58,9 +67,12 @@ fn main() {
         }))
         .add_startup_system(setup)
         .add_system(pan_orbit_camera)
-        .add_system(spawn_cube)
-        .add_system(move_cube)
         .add_plugin(WireframePlugin)
+        .add_system_set(
+            SystemSet::new()
+                .with_run_criteria(FixedTimestep::step(2.5))
+                .with_system(spawn_cubes),
+        )
         .run();
 }
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
@@ -79,7 +91,9 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
                     },
     ));
 
-
+    Turn {
+        from_x: false,
+    };
 
 
     // light
@@ -94,60 +108,43 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         ..default()
     }));
 
-    // cube
-    commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 9.0 })),
-            material: materials.add(Color::LIME_GREEN.into()),
-            transform: Transform::from_translation(Vec3::ZERO),
-            ..default()
-        }));
+
+    commands.spawn((PbrBundle {
+        mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
+        material: materials.add(Color::RED.into()),
+        transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
+        ..default()
+    },
+                    Wireframe,
+                    MovableCube { speed: 2.0, dst: 90.0 },
+    ));
+
 }
 
 
-fn spawn_cube(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, keys: Res<Input<KeyCode>>) {
-    let mut x: f32 = 0.0;
-    let mut y: f32 = 0.0;
-    let mut z: f32 = -6.0;
-    let mut trans: Vec3 = Vec3::new(x, y, z);
 
-    if keys.pressed(KeyCode::G) {
 
+
+fn spawn_cubes(mut commands: Commands, keys: Res<Input<KeyCode>>, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, turn: Query<&mut Turn>) {
+
+        if turn.from_x == false {
             commands.spawn((PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Cube { size: 3.0 })),
-                material: materials.add(Color::RED.into()),
-                transform: Transform::from_translation(trans),
+                mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
+                material: materials.add(Color::SEA_GREEN.into()),
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -15.0)),
                 ..default()
-            },
-            Wireframe,
-            MovableCube { x: x, y: y, z: z, speed: 2.0, dst: 90.0 },
-            ));
-        
-        
-    }
-}
-
-fn move_cube(mut cubes: Query<(&mut Transform, &MovableCube)>, timer: Res<Time>, keys: Res<Input<KeyCode>>) {
-    
-    for (mut transform, cube) in &mut cubes {
-        let dir_x = transform.local_x();
-        let dir_y = transform.local_y();
-        let dir_z = transform.local_z();
-        
-        if keys.pressed(KeyCode::Space) {
-            transform.translation += dir_y * cube.speed * timer.delta_seconds() * cube.dst;
-        }  else if keys.pressed(KeyCode::LShift) {
-            transform.translation += -dir_y * cube.speed * timer.delta_seconds() * cube.dst;
-        } else if keys.pressed(KeyCode::A) {
-            transform.translation += dir_x * cube.speed * timer.delta_seconds() * cube.dst;
-        } else if keys.pressed(KeyCode::D) {
-            transform.translation += -dir_x * cube.speed * timer.delta_seconds() * cube.dst;
-        } else if keys.pressed(KeyCode::W) {
-            transform.translation += dir_z * cube.speed * timer.delta_seconds() * cube.dst;
-        } else if keys.pressed(KeyCode::S) {
-            transform.translation += -dir_z * cube.speed * timer.delta_seconds() * cube.dst;
+            }));
+        } else {
+            commands.spawn((PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
+                material: materials.add(Color::SEA_GREEN.into()),
+                transform: Transform::from_translation(Vec3::new(-15.0, 0.0, 0.0)),
+                ..default()
+            }));
         }
-    }
+
+
+
 }
 
 
@@ -227,6 +224,8 @@ fn pan_orbit_camera(windows: Res<Windows>, mut ev_motion: EventReader<MouseMotio
             let rot_matrix = Mat3::from_quat(transform.rotation);
             transform.translation = pan_orbit.focus + rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, pan_orbit.radius));
         }
+
+
     }
 }
 fn get_primary_window_size(windows: &Res<Windows>) -> Vec2 {
