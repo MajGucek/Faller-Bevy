@@ -1,6 +1,7 @@
 #[warn(dead_code)]
 use bevy::prelude::*;
 use std::f32::consts::TAU;
+use std::ptr::null;
 use bevy::core_pipeline::clear_color::ClearColorConfig;
 use bevy::ecs::system::{OptionResMutState, ResMutState, ResState};
 use bevy::ecs::system::lifetimeless::SResMut;
@@ -31,23 +32,24 @@ impl Default for PanOrbitCamera {
     }
 }
 
-#[derive(Component)]
-struct MovableCube {
-    speed: f32,
-    dst: f32,
-}
 
 #[derive(Component)]
-struct Turn {
-    from_x: bool,
+struct Size {
+    width: f32,
+    height: f32,
 }
-impl Default for Turn {
-    fn default() -> Self {
-        Turn {
-            from_x: false,
-        }
+
+#[derive(Resource)]
+struct Dir {
+    side: bool,
+}
+impl Dir {
+    fn switch(&mut self) {
+        self.side = !self.side;
     }
 }
+
+
 
 
 
@@ -66,13 +68,10 @@ fn main() {
             close_when_requested: true,
         }))
         .add_startup_system(setup)
+        .insert_resource(Dir { side: false })
         .add_system(pan_orbit_camera)
         .add_plugin(WireframePlugin)
-        .add_system_set(
-            SystemSet::new()
-                .with_run_criteria(FixedTimestep::step(2.5))
-                .with_system(spawn_cubes),
-        )
+        .add_system(spawn_cubes)
         .run();
 }
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
@@ -91,9 +90,6 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
                     },
     ));
 
-    Turn {
-        from_x: false,
-    };
 
 
     // light
@@ -116,18 +112,15 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         ..default()
     },
                     Wireframe,
-                    MovableCube { speed: 2.0, dst: 90.0 },
     ));
 
 }
 
 
 
-
-
-fn spawn_cubes(mut commands: Commands, keys: Res<Input<KeyCode>>, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, turn: Query<&mut Turn>) {
-
-        if turn.from_x == false {
+fn spawn_cubes(mut commands: Commands, keys: Res<Input<KeyCode>>, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut dir: ResMut<Dir>) {
+    if keys.just_pressed(KeyCode::Space) {
+        if dir.side == false {
             commands.spawn((PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
                 material: materials.add(Color::SEA_GREEN.into()),
@@ -142,9 +135,8 @@ fn spawn_cubes(mut commands: Commands, keys: Res<Input<KeyCode>>, mut meshes: Re
                 ..default()
             }));
         }
-
-
-
+        dir.switch();
+    }
 }
 
 
