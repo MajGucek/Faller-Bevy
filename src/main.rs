@@ -1,18 +1,10 @@
 #[warn(dead_code)]
 use bevy::prelude::*;
-use std::f32::consts::TAU;
-use std::ptr::null;
-use bevy::core_pipeline::clear_color::ClearColorConfig;
-use bevy::ecs::system::{OptionResMutState, ResMutState, ResState};
-use bevy::ecs::system::lifetimeless::SResMut;
 use bevy::input::mouse::{MouseWheel,MouseMotion};
 use bevy::render::camera::Projection;
-use bevy::window::PresentMode;
-use bevy::window::CursorGrabMode;
-use bevy::pbr::wireframe::{Wireframe, WireframeConfig, WireframePlugin};
-use bevy::render::{render_resource::WgpuFeatures, settings::WgpuSettings};
-use rand::*;
-use bevy::time::{FixedTimestep, Stopwatch};
+use bevy::pbr::wireframe::{Wireframe, WireframePlugin};
+use bevy::time::FixedTimestep;
+
 
 #[derive(Component)]
 struct PanOrbitCamera {
@@ -39,19 +31,36 @@ struct Size {
     height: f32,
 }
 
-#[derive(Resource)]
-struct Dir {
-    side: bool,
-}
-impl Dir {
-    fn switch(&mut self) {
-        self.side = !self.side;
+#[derive(Resource, Default)]
+pub struct NextDir(pub Dir);
+// Left = from_z, Right = from_x
+impl NextDir {
+    pub fn switch(&mut self) {
+        match self.0 {
+            Dir::Left => { self.0 = Dir::Right; },
+            Dir::Right => { self.0 = Dir::Left; },
+        }
     }
 }
+#[derive(Default)]
+pub enum Dir {
+    #[default]
+    Left,
+    Right
+}
 
+#[derive(Resource, Default)]
+struct BlockCount(u32);
 
+#[derive(Component)]
+struct VelocityZ {
+    z: f32,
+}
 
-
+#[derive(Component)]
+struct VelocityX {
+    x: f32,
+}
 
 fn main() {
     App::new()
@@ -68,10 +77,18 @@ fn main() {
             close_when_requested: true,
         }))
         .add_startup_system(setup)
-        .insert_resource(Dir { side: false })
+        .insert_resource(NextDir::default())
         .add_system(pan_orbit_camera)
         .add_plugin(WireframePlugin)
         .add_system(spawn_cubes)
+        .add_system_set(
+            SystemSet::new()
+                .with_run_criteria(FixedTimestep::step(5.0))
+                .with_system(spawn_cubes),
+        )
+        .insert_resource(BlockCount)
+        .add_system(moving_cube_z)
+        .add_system(moving_cube_x)
         .run();
 }
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
@@ -118,32 +135,48 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
 
 
 
-fn spawn_cubes(mut commands: Commands, keys: Res<Input<KeyCode>>, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut dir: ResMut<Dir>) {
-    if keys.just_pressed(KeyCode::Space) {
-        if dir.side == false {
-            commands.spawn((PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
-                material: materials.add(Color::SEA_GREEN.into()),
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -15.0)),
-                ..default()
-            }));
-        } else {
-            commands.spawn((PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
-                material: materials.add(Color::SEA_GREEN.into()),
-                transform: Transform::from_translation(Vec3::new(-15.0, 0.0, 0.0)),
-                ..default()
-            }));
+fn spawn_cubes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut dir: ResMut<NextDir>, mut block_count: ResMut<BlockCount>) {
+    if block_count.0 < 2 {
+        match dir.0 {
+            Dir::Left => {
+                commands.spawn((PbrBundle {
+                    mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
+                    material: materials.add(Color::SEA_GREEN.into()),
+                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, -15.0)),
+                    ..default()
+                },
+                                VelocityZ { z: -15.0 },
+                ));
+            },
+            Dir::Right => {
+                commands.spawn((PbrBundle {
+                    mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
+                    material: materials.add(Color::SEA_GREEN.into()),
+                    transform: Transform::from_translation(Vec3::new(-15.0, 0.0, 0.0)),
+                    ..default()
+                },
+                                VelocityX { x: -15.0 },
+                ));
+            }
         }
         dir.switch();
     }
 }
 
 
+fn moving_cube_z(mut cubes: Query<(&mut Transform, &mut VelocityZ)>, timer: Res<Time>) {
+    for (mut transform, cube) in &mut cubes {
+        let dir = transform.local_z();
+        transform.translation += -dir * cube.z * timer.delta_seconds();
+    }
+}
 
-
-
-
+fn moving_cube_x(mut cubes: Query<(&mut Transform, &mut VelocityX)>, timer: Res<Time>) {
+    for (mut transform, cube) in &mut cubes {
+        let dir = transform.local_x();
+        transform.translation += -dir * cube.x * timer.delta_seconds();
+    }
+}
 
 // Zoom with scroll wheel, orbit with left mouse click.
 fn pan_orbit_camera(windows: Res<Windows>, mut ev_motion: EventReader<MouseMotion>, mut ev_scroll: EventReader<MouseWheel>, input_mouse: Res<Input<MouseButton>>, mut query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>, ) {
