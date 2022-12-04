@@ -7,7 +7,7 @@ use bevy::pbr::wireframe::{Wireframe, WireframePlugin};
 use bevy::time::FixedTimestep;
 
 
-
+/*
 #[derive(Component)]
 struct PanOrbitCamera {
     /// The "focus point" to orbit around. It is automatically updated when panning the camera
@@ -25,7 +25,7 @@ impl Default for PanOrbitCamera {
         }
     }
 }
-
+*/
 
 
 
@@ -93,7 +93,7 @@ fn main() {
         .insert_resource(Clicked{counter: 0})
         .insert_resource(NextDir::default())
         .add_system(user_click)
-        .add_system(pan_orbit_camera)
+        //.add_system(pan_orbit_camera)
         .add_plugin(WireframePlugin)
         .add_system(spawn_cubes)
         .add_system_set(
@@ -110,18 +110,12 @@ fn main() {
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
 
     // camera
-    let translation = Vec3::new(0.0, 0.0, 20.0);
+    let translation = Vec3::new(20.0, 20.0, 20.0);
     let radius = translation.length();
     commands.spawn((Camera3dBundle {
         transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
-
         ..default()
-    },
-                    PanOrbitCamera {
-                        radius,
-                        ..Default::default()
-                    },
-    ));
+    }));
 
 
 
@@ -139,13 +133,18 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
 
 
     commands.spawn((PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
+        mesh: meshes.add(Mesh::from(shape::Box {
+            min_x: -2.5,
+            max_x: 2.5,
+            min_y: -50.0 + 2.5,
+            max_y: 2.5,
+            min_z: -2.5,
+            max_z: 2.5,
+        })),
         material: materials.add(Color::RED.into()),
         transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
         ..default()
-    },
-                    Wireframe,
-    ));
+    }));
 
 }
 
@@ -163,7 +162,7 @@ fn spawn_cubes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut mat
                         commands.spawn((PbrBundle {
                             mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
                             material: materials.add(Color::SEA_GREEN.into()),
-                            transform: Transform::from_translation(Vec3::new(0.0, 0.0, -15.0)),
+                            transform: Transform::from_translation(Vec3::new(0.0, 5.0, -15.0)),
                             ..default()
                         },
                                         VelocityZ { z: -15.0 },
@@ -173,7 +172,7 @@ fn spawn_cubes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut mat
                         commands.spawn((PbrBundle {
                             mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
                             material: materials.add(Color::SEA_GREEN.into()),
-                            transform: Transform::from_translation(Vec3::new(-15.0, 0.0, 0.0)),
+                            transform: Transform::from_translation(Vec3::new(-15.0, 5.0, 0.0)),
                             visibility: Visibility {
                                 is_visible: false,
                             },
@@ -190,14 +189,16 @@ fn spawn_cubes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut mat
 }
 
 
-fn moving_cube_z(mut cubes: Query<(&mut Transform, &mut VelocityZ)>, timer: Res<Time>) {
-
+fn moving_cube_z(mut cubes: Query<(&mut Transform, &mut VelocityZ)>, timer: Res<Time>, keys: Res<Input<KeyCode>>) {
     for (mut transform, cube) in &mut cubes {
         let dir = transform.local_z();
-        transform.translation += -dir * cube.z * timer.delta_seconds();
+        let down = transform.local_y();
+        if !keys.just_pressed(KeyCode::Space) {
+            transform.translation += -dir * cube.z * timer.delta_seconds();
+        } else {
+            transform.translation += down * cube.z * timer.delta_seconds();
+        }
     }
-
-
 }
 
 fn moving_cube_x(mut cubes: Query<(&mut Transform, &mut VelocityX)>, timer: Res<Time>) {
@@ -209,6 +210,7 @@ fn moving_cube_x(mut cubes: Query<(&mut Transform, &mut VelocityX)>, timer: Res<
     }
 }
 
+/*
 // Zoom with scroll wheel, orbit with left mouse click.
 fn pan_orbit_camera(windows: Res<Windows>, mut ev_motion: EventReader<MouseMotion>, mut ev_scroll: EventReader<MouseWheel>, input_mouse: Res<Input<MouseButton>>, mut query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>, ) {
     // change input mapping for orbit and panning here
@@ -289,3 +291,5 @@ fn get_primary_window_size(windows: &Res<Windows>) -> Vec2 {
     let window = Vec2::new(window.width() as f32, window.height() as f32);
     window
 }
+
+ */
