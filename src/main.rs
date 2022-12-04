@@ -1,9 +1,11 @@
-#[warn(dead_code)]
+#![allow(dead_code, unused)]
+#![allow(non_snake_case)]
 use bevy::prelude::*;
 use bevy::input::mouse::{MouseWheel,MouseMotion};
 use bevy::render::camera::Projection;
 use bevy::pbr::wireframe::{Wireframe, WireframePlugin};
 use bevy::time::FixedTimestep;
+
 
 
 #[derive(Component)]
@@ -25,11 +27,9 @@ impl Default for PanOrbitCamera {
 }
 
 
-#[derive(Component)]
-struct Size {
-    width: f32,
-    height: f32,
-}
+
+
+
 
 #[derive(Resource, Default)]
 pub struct NextDir(pub Dir);
@@ -50,7 +50,10 @@ pub enum Dir {
 }
 
 #[derive(Resource, Default)]
-struct BlockCount(u32);
+struct BlockCount {
+    count: u32,
+}
+
 
 #[derive(Component)]
 struct VelocityZ {
@@ -60,6 +63,16 @@ struct VelocityZ {
 #[derive(Component)]
 struct VelocityX {
     x: f32,
+}
+
+#[derive(Resource, Default)]
+struct Clicked {
+    counter: u32,
+}
+impl Clicked {
+    fn click(&mut self) {
+        self.counter += 1;
+    }
 }
 
 fn main() {
@@ -77,18 +90,21 @@ fn main() {
             close_when_requested: true,
         }))
         .add_startup_system(setup)
+        .insert_resource(Clicked{counter: 0})
         .insert_resource(NextDir::default())
+        .add_system(user_click)
         .add_system(pan_orbit_camera)
         .add_plugin(WireframePlugin)
         .add_system(spawn_cubes)
         .add_system_set(
             SystemSet::new()
-                .with_run_criteria(FixedTimestep::step(5.0))
+                .with_run_criteria(FixedTimestep::step(144.0))
                 .with_system(spawn_cubes),
         )
-        .insert_resource(BlockCount)
+        .insert_resource(BlockCount {count: 0})
         .add_system(moving_cube_z)
-        .add_system(moving_cube_x)
+
+        // .add_system(moving_cube_x)
         .run();
 }
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
@@ -111,7 +127,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
 
     // light
     let entity_spawn: Vec3 = Vec3::new(0.0, 8.0, 0.0);
-    commands.spawn((PointLightBundle {
+    commands.spawn(PointLightBundle {
         point_light: PointLight {
             intensity: 5000.0,
             shadows_enabled: true,
@@ -119,7 +135,7 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
         },
         transform: Transform::from_translation(entity_spawn),
         ..default()
-    }));
+    });
 
 
     commands.spawn((PbrBundle {
@@ -133,48 +149,63 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
 
 }
 
+fn user_click(mut click: ResMut<Clicked>, keys: Res<Input<KeyCode>>) {
+    if keys.pressed(KeyCode::Key1) {
+        click.click();
+    }
+}
 
-
-fn spawn_cubes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut dir: ResMut<NextDir>, mut block_count: ResMut<BlockCount>) {
-    if block_count.0 < 2 {
-        match dir.0 {
-            Dir::Left => {
-                commands.spawn((PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
-                    material: materials.add(Color::SEA_GREEN.into()),
-                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, -15.0)),
-                    ..default()
-                },
-                                VelocityZ { z: -15.0 },
-                ));
-            },
-            Dir::Right => {
-                commands.spawn((PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
-                    material: materials.add(Color::SEA_GREEN.into()),
-                    transform: Transform::from_translation(Vec3::new(-15.0, 0.0, 0.0)),
-                    ..default()
-                },
-                                VelocityX { x: -15.0 },
-                ));
+fn spawn_cubes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut dir: ResMut<NextDir>, mut block_count: ResMut<BlockCount>, click_count: Res<Clicked>) {
+        if click_count.counter != 0 {
+            if block_count.count < 2 {
+                match dir.0 {
+                    Dir::Left => {
+                        commands.spawn((PbrBundle {
+                            mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
+                            material: materials.add(Color::SEA_GREEN.into()),
+                            transform: Transform::from_translation(Vec3::new(0.0, 0.0, -15.0)),
+                            ..default()
+                        },
+                                        VelocityZ { z: -15.0 },
+                        ));
+                    },
+                    Dir::Right => {
+                        commands.spawn((PbrBundle {
+                            mesh: meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
+                            material: materials.add(Color::SEA_GREEN.into()),
+                            transform: Transform::from_translation(Vec3::new(-15.0, 0.0, 0.0)),
+                            visibility: Visibility {
+                                is_visible: false,
+                            },
+                            ..default()
+                        },
+                                        VelocityX { x: -15.0 },
+                        ));
+                    }
+                }
+                dir.switch();
+                block_count.count += 1;
             }
         }
-        dir.switch();
-    }
 }
 
 
 fn moving_cube_z(mut cubes: Query<(&mut Transform, &mut VelocityZ)>, timer: Res<Time>) {
+
     for (mut transform, cube) in &mut cubes {
         let dir = transform.local_z();
         transform.translation += -dir * cube.z * timer.delta_seconds();
     }
+
+
 }
 
 fn moving_cube_x(mut cubes: Query<(&mut Transform, &mut VelocityX)>, timer: Res<Time>) {
-    for (mut transform, cube) in &mut cubes {
-        let dir = transform.local_x();
-        transform.translation += -dir * cube.x * timer.delta_seconds();
+    if timer.delta_seconds() % 2.0 == 1.0 {
+        for (mut transform, cube) in &mut cubes {
+            let dir = transform.local_x();
+            transform.translation += -dir * cube.x * timer.delta_seconds();
+        }
     }
 }
 
