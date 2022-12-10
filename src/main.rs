@@ -1,6 +1,10 @@
 #![allow(dead_code, unused)]
 #![allow(non_snake_case)]
+#![feature(core_panic)]
 
+extern crate core;
+
+use core::panicking::panic;
 use std::f32::consts::TAU;
 use bevy::prelude::*;
 use bevy::input::mouse::{MouseWheel,MouseMotion};
@@ -9,6 +13,7 @@ use bevy::pbr::wireframe::{Wireframe, WireframePlugin};
 use bevy::prelude::shape::Cube;
 use bevy::time::FixedTimestep;
 use bevy::transform::transform_propagate_system;
+use bevy::ui::FocusPolicy::Block;
 use rand::*;
 
 
@@ -75,13 +80,11 @@ fn main() {
         .add_plugin(WireframePlugin)
         .add_system(move_cubes)
         .add_system(despawn_cubes)
+        .add_system(player_collision_checker)
         .run();
 }
 
 
-
-
-fn player_death()
 
 
 
@@ -95,7 +98,7 @@ fn despawn_cubes(mut commands: Commands, mut query: Query<(Entity, &mut Transfor
     }
 }
 
-fn move_cubes(mut blocks: Query<(&mut Transform, &mut StandardMaterial, &mut Blocks)>, timer: Res<Time>) {
+fn move_cubes(mut blocks: Query<(&mut Transform, &mut Blocks)>, timer: Res<Time>) {
     for (mut transform, block) in &mut blocks {
         let dir_y = transform.local_y();
         transform.translation += dir_y * timer.delta_seconds() * block.speed;
@@ -120,10 +123,15 @@ fn spawn_cubes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut mat
         let mut coords: Vec3 = Vec3::new(x_range as f32, y_range as f32, z_range as f32);
 
 
-        if cubes.cube_count < 500 {
+        if cubes.cube_count < 100 {
                 commands.spawn((PbrBundle {
-                    mesh: meshes.add(Mesh::from(shape::Cube {
-                        size: 5.0,
+                    mesh: meshes.add(Mesh::from(shape::Box {
+                        min_x: -2.5, // left - right
+                        max_x: 2.5,
+                        min_y: -2.5, // lenght 3D
+                        max_y: 2.5,
+                        min_z: -2.5, // up down
+                        max_z: 2.5,
                     })),
                     material: materials.add(Color::MIDNIGHT_BLUE.into()),
                     transform: Transform::from_translation(coords),
@@ -145,24 +153,43 @@ fn move_camera(mut cameras: Query<(&mut Transform, &Camera)>, keys: Res<Input<Ke
         let dir_y = transform.local_y();
         if keys.pressed(KeyCode::A) && transform.translation.x > -40.0 {
             transform.translation += -dir_x * timer.delta_seconds() * camera.speed;
-            println!("{}", transform.translation.x);
+            println!("Moved Left");
 
         }
         if keys.pressed(KeyCode::D) && transform.translation.x < 40.0 {
             transform.translation += dir_x * timer.delta_seconds() * camera.speed;
-            println!("{}", transform.translation.x);
+            println!("Moved Right");
 
         }
         if keys.pressed(KeyCode::S) && transform.translation.z < 40.0 {
             transform.translation -= dir_y * timer.delta_seconds() * camera.speed;
-            println!("{}", transform.translation.z);
+            println!("Moved Down");
         }
         if keys.pressed(KeyCode::W) && transform.translation.z > -40.0 {
             transform.translation += dir_y * timer.delta_seconds() * camera.speed;
-            println!("{}", transform.translation.z);
+            println!("Moved Up");
         }
     }
 }
+
+fn player_collision_checker(mut commands: Commands, mut blocks: Query<(&Transform, &Blocks)>, mut cameras: Query<(&Transform, &Camera)>) {
+    for (mut BlockTransform, block) in blocks.iter_mut() {
+        for (mut CameraTransform, camera) in &mut cameras {
+
+            if (CameraTransform.translation.x > BlockTransform.translation.x - 2.5 && CameraTransform.translation.x < BlockTransform.translation.x + 2.5) &&
+                (CameraTransform.translation.y > BlockTransform.translation.y - 2.5 && CameraTransform.translation.y < BlockTransform.translation.y + 2.5) &&
+                (CameraTransform.translation.z > BlockTransform.translation.z - 2.5 && CameraTransform.translation.z < BlockTransform.translation.z + 2.5) {
+                todo!("Implement Death");
+            }
+
+
+
+
+
+        }
+    }
+}
+
 
 fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
     // camera
@@ -171,19 +198,6 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     commands.spawn((Camera3dBundle {
 
         transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
-        ..default()
-    },
-                    Camera { speed: 10.0 }
-    ));
-    // camera hitbox
-    commands.spawn((PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Cube {
-            size: 5.0,
-        })),
-        transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
-        visibility: Visibility {
-            is_visible: false,
-        },
         ..default()
     },
                     Camera { speed: 10.0 }
