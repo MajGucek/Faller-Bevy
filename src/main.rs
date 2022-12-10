@@ -63,8 +63,13 @@ fn main() {
         .add_system(move_camera)
         .add_system_set(
             SystemSet::new()
-                .with_run_criteria(FixedTimestep::step(0.05))
+                .with_run_criteria(FixedTimestep::step(0.01))
                 .with_system(spawn_cubes),
+        )
+        .add_system_set(
+            SystemSet::new()
+                .with_run_criteria(FixedTimestep::step(0.5))
+                .with_system(increase_speed),
         )
         .insert_resource(ClearColor(Color::rgb(0.5, 0.5, 0.7)))
         .add_plugin(WireframePlugin)
@@ -73,31 +78,49 @@ fn main() {
         .run();
 }
 
+
+
+
+fn player_death()
+
+
+
+
 fn despawn_cubes(mut commands: Commands, mut query: Query<(Entity, &mut Transform, &Movable)>, mut cubes: ResMut<Cubes>) {
     for (entity, mut transform, movable) in query.iter_mut() {
-        if movable.auto_despawn == true && transform.translation.y > 25.0 {
+        if movable.auto_despawn == true && transform.translation.y > 55.0 {
             commands.entity(entity).despawn();
             cubes.decrease();
         }
     }
 }
 
-fn move_cubes(mut blocks: Query<(&mut Transform, &Blocks)>, timer: Res<Time>) {
+fn move_cubes(mut blocks: Query<(&mut Transform, &mut StandardMaterial, &mut Blocks)>, timer: Res<Time>) {
     for (mut transform, block) in &mut blocks {
         let dir_y = transform.local_y();
         transform.translation += dir_y * timer.delta_seconds() * block.speed;
     }
 }
 
+fn increase_speed(mut blocks: Query<(&mut Blocks)>) {
+    for (mut block) in &mut blocks {
+        block.speed += 10.0;
+    }
+}
+
+
 fn spawn_cubes(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>, mut cubes: ResMut<Cubes>, query: Query<Entity, With<Blocks>>) {
         // generate cubes in range [-25, 25]
         let mut rng = thread_rng();
-        let mut x_range: f32 = rng.gen_range(-25.0..=25.0);
-        let mut y_range: f32 = rng.gen_range(-15.0..=-5.0);
-        let mut z_range: f32 = rng.gen_range(-25.0..=25.0);
-        let mut coords: Vec3 = Vec3::new(x_range, y_range, z_range);
+        let mut x_range: i32 = rng.gen_range(-50..=50); //   <-    ->
+        let mut z_range: i32 = rng.gen_range(-50..=50); // ↑      ↓
 
-        if cubes.cube_count < 50 {
+        let mut y_range: i32 = rng.gen_range(-150..=-125); // 3D
+
+        let mut coords: Vec3 = Vec3::new(x_range as f32, y_range as f32, z_range as f32);
+
+
+        if cubes.cube_count < 500 {
                 commands.spawn((PbrBundle {
                     mesh: meshes.add(Mesh::from(shape::Cube {
                         size: 5.0,
@@ -120,21 +143,21 @@ fn move_camera(mut cameras: Query<(&mut Transform, &Camera)>, keys: Res<Input<Ke
     for (mut transform, camera) in &mut cameras {
         let dir_x = transform.local_x();
         let dir_y = transform.local_y();
-        if keys.pressed(KeyCode::A) && transform.translation.x > -50.0 {
+        if keys.pressed(KeyCode::A) && transform.translation.x > -40.0 {
             transform.translation += -dir_x * timer.delta_seconds() * camera.speed;
             println!("{}", transform.translation.x);
 
         }
-        if keys.pressed(KeyCode::D) && transform.translation.x < 50.0 {
+        if keys.pressed(KeyCode::D) && transform.translation.x < 40.0 {
             transform.translation += dir_x * timer.delta_seconds() * camera.speed;
             println!("{}", transform.translation.x);
 
         }
-        if keys.pressed(KeyCode::S) && transform.translation.z < 25.0 {
+        if keys.pressed(KeyCode::S) && transform.translation.z < 40.0 {
             transform.translation -= dir_y * timer.delta_seconds() * camera.speed;
             println!("{}", transform.translation.z);
         }
-        if keys.pressed(KeyCode::W) && transform.translation.z > -25.0 {
+        if keys.pressed(KeyCode::W) && transform.translation.z > -40.0 {
             transform.translation += dir_y * timer.delta_seconds() * camera.speed;
             println!("{}", transform.translation.z);
         }
@@ -165,20 +188,5 @@ fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials
     },
                     Camera { speed: 10.0 }
     ));
-
-
-
-
-    // light
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 1000.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_translation(Vec3::new(0.0, 25.0, 0.0)),
-
-        ..default()
-    });
 }
 
